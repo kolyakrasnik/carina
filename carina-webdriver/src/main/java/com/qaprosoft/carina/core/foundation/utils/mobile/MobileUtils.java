@@ -1,20 +1,40 @@
 package com.qaprosoft.carina.core.foundation.utils.mobile;
 
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.log4j.Logger;
+import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.Point;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.FluentWait;
 
+import com.google.common.base.Function;
 import com.qaprosoft.carina.core.foundation.utils.Configuration;
 import com.qaprosoft.carina.core.foundation.utils.Configuration.Parameter;
 import com.qaprosoft.carina.core.foundation.webdriver.DriverPool;
 import com.qaprosoft.carina.core.foundation.webdriver.decorator.ExtendedWebElement;
-import com.qaprosoft.carina.core.foundation.webdriver.device.DevicePool;
 
 import io.appium.java_client.AppiumDriver;
+import io.appium.java_client.MobileDriver;
+import io.appium.java_client.TouchAction;
 
 public class MobileUtils {
     protected static final Logger LOGGER = Logger.getLogger(MobileUtils.class);
+    
+    /**
+     * With interval of 2 seconds swipe action speed (preliminary for half
+     * screen) is somewhere in the middle - not so fast, not so long.
+     * <p>
+     * Tested at Nexus 6P Android 8.0.0.
+     */
+    private static final int SWIPE_ACTION_DEFAULT_INTERVAL = 2000;
+    
+    private static final int SWIPE_TO_ELEMENT_DEFAULT_TIMEOUT = 30000;
+
+    private static final int SWIPE_TO_ELEMENT_DEFAULT_PULLING_TIMEOUT = 2500;
 
     public enum Direction {
         LEFT, RIGHT, UP, DOWN, VERTICAL, HORIZONTAL, VERTICAL_DOWN_FIRST, HORIZONTAL_RIGHT_FIRST
@@ -28,326 +48,345 @@ public class MobileUtils {
 
     protected static final int DEFAULT_SWIPE_TIMEOUT = 1000;
 
-    public enum JSDirection {
-        UP("up"), DOWN("down");
 
-        String directionName;
-
-        JSDirection(String directionName) {
-            this.directionName = directionName;
-        }
-
-        public String getName() {
-            return directionName;
-        }
-
-    }
-
+	/**
+	 * Hide keyboard if needed
+	 */
+	public static void hideKeyboard() {
+		try {
+			((AppiumDriver<?>) DriverPool.getDriver()).hideKeyboard();
+		} catch (Exception e) {
+			LOGGER.info("Keyboard was already hided or error occurs: " + e);
+		}
+	}
+	
     /**
-     * nanoSwipe
+     * Tap element (using TouchAction)
      * 
-     * @param element ExtendedWebElement
-     * @param direction Direction
+     * @param element WebElement
      */
-    public static void nanoSwipe(ExtendedWebElement element, Direction direction) {
-        swipeInDevice(element, direction, 0.01, 0.99, 500);
+    public static void tapElement(ExtendedWebElement element) {
+        Point point = element.getLocation();
+        Dimension size = element.getSize();
+        tap(point.getX() + size.getWidth() / 2, point.getY() + size.getHeight() / 2);
     }
-
+    
     /**
-     * swipeInDevice
+     * Tap with TouchAction by coordinates
      * 
-     * @param element ExtendedWebElement
-     * @param direction Direction
+     * @param startx int
+     * @param starty int
      */
-    public static void swipeInDevice(ExtendedWebElement element, Direction direction) {
-        swipeInDevice(element, direction, 0.1, 0.9, 1000);
+    public static void tap(int startx, int starty) {
+        TouchAction touchAction = new TouchAction((AppiumDriver<?>) DriverPool.getDriver());
+        touchAction.tap(startx, starty).perform();
     }
-
+    
     /**
-     * swipeInDevice
-     * 
+     * Tap and Hold (LongPress) on element
+     *
      * @param element ExtendedWebElement
-     * @param direction Direction
-     * @param minCoefficient double
-     * @param maxCoefficient double
-     * @param duration int
      * @return boolean
      */
-    @SuppressWarnings({ "rawtypes", "incomplete-switch" })
-    public static boolean swipeInDevice(ExtendedWebElement element, Direction direction, double minCoefficient, double maxCoefficient, int duration) {
-        if (element.isElementNotPresent(5)) {
-            LOGGER.warn("Cannot swipe! Impossible to find element " + element.getName());
-            return false;
-        }
-        int startx = 0;
-        int starty = 0;
-        int endx = 0;
-        int endy = 0;
-        String name = element.getName();
-
-        Point elementLocation = element.getElement().getLocation();
-        Dimension elementDimensions = element.getElement().getSize();
-
-        LOGGER.debug(String.format("'%s' location %s", name, elementLocation.toString()));
-        LOGGER.debug(String.format("'%s' size %s", name, elementDimensions.toString()));
-        switch (direction) {
-        case LEFT:
-            startx = (int) (elementLocation.getX() + Math.round(maxCoefficient * elementDimensions.getWidth()));
-            starty = elementLocation.getY() + Math.round(elementDimensions.getHeight() / 2);
-            endx = (int) (elementLocation.getX() + Math.round(minCoefficient * elementDimensions.getWidth()));
-            endy = starty;
-            break;
-        case RIGHT:
-            startx = (int) (elementLocation.getX() + Math.round(minCoefficient * elementDimensions.getWidth()));
-            starty = elementLocation.getY() + Math.round(elementDimensions.getHeight() / 2);
-            endx = (int) (elementLocation.getX() + Math.round(maxCoefficient * elementDimensions.getWidth()));
-            endy = starty;
-            break;
-        case UP:
-            startx = elementLocation.getX() + Math.round(elementDimensions.getWidth() / 2);
-            starty = (int) (elementLocation.getY() + Math.round(maxCoefficient * elementDimensions.getHeight()));
-            endx = startx;
-            endy = (int) (elementLocation.getY() + Math.round(minCoefficient * elementDimensions.getHeight()));
-            break;
-        case DOWN:
-            startx = elementLocation.getX() + Math.round(elementDimensions.getWidth() / 2);
-            starty = (int) (elementLocation.getY() + Math.round(minCoefficient * elementDimensions.getHeight()));
-            endx = startx;
-            endy = (int) (elementLocation.getY() + Math.round(maxCoefficient * elementDimensions.getHeight()));
-            break;
-        }
-        LOGGER.debug(String.format("Swipe from (X = %d; Y = %d) to (X = %d; Y = %d)", startx, starty, endx, endy));
+    public static boolean longPress(ExtendedWebElement element) {
         try {
             WebDriver driver = DriverPool.getDriver();
-
-            ((AppiumDriver) driver).swipe(startx, starty, endx, endy, duration);
+            TouchAction action = new TouchAction((MobileDriver<?>) driver);
+            action.longPress(element.getElement()).release().perform();
             return true;
         } catch (Exception e) {
-            LOGGER.error(String.format("Error during Swipe from (X = %d; Y = %d) to (X = %d; Y = %d): %s", startx, starty, endx, endy, e));
+            LOGGER.info("Error occurs: " + e);
         }
         return false;
     }
 
+
     /**
-     * swipeInContainerTillElement
+     * Swipe up
      * 
-     * @param element ExtendedWebElement
-     * @param container ExtendedWebElement
-     * @return boolean
+     * @param duration int
      */
-    public static boolean swipeInContainerTillElement(ExtendedWebElement element, ExtendedWebElement container) {
-        return swipeInContainerTillElement(element, container, 10);
+    public static void swipeUp(final int duration) {
+        WebDriver driver = DriverPool.getDriver();
+        int x = driver.manage().window().getSize().width / 2;
+        int y = driver.manage().window().getSize().height;
+        LOGGER.info("Swipe up will be executed.");
+        swipe(x, y / 2, x, y * 4 / 5, duration);
     }
 
     /**
-     * swipeInContainerTillElement
+     * Swipe up several times
      * 
-     * @param element ExtendedWebElement
-     * @param container ExtendedWebElement
-     * @param swipeTimes int
-     * @return boolean
-     */
-    public static boolean swipeInContainerTillElement(ExtendedWebElement element, ExtendedWebElement container, int swipeTimes) {
-        boolean isPresent = element.isElementPresent(2);
-        LOGGER.info("Swipe to element: ".concat(element.getNameWithLocator().toString()));
-
-        int defaultSwipeTimes = swipeTimes;
-        while (!isPresent && swipeTimes-- > 0) {
-            LOGGER.debug("Element not present! Swipe up will be executed.");
-            swipeInDevice(container, Direction.UP, 0.2, 0.8, 1000);
-            LOGGER.info("Swipe was executed. Attempts remain: " + swipeTimes);
-            isPresent = element.isElementPresent(1);
-            LOGGER.info("Result: " + isPresent);
-        }
-
-        if (!isPresent) {
-            LOGGER.info("Swipe down to element: ".concat(element.getNameWithLocator().toString()));
-            swipeTimes = defaultSwipeTimes;
-
-            while (!isPresent && swipeTimes-- > 0) {
-                LOGGER.debug("Element not present! Swipe down will be executed.");
-                swipeInDevice(container, Direction.DOWN, 0.2, 0.8, 1000);
-                LOGGER.info("Swipe was executed. Attempts remain: " + swipeTimes);
-                isPresent = element.isElementPresent(1);
-                LOGGER.info("Result: " + isPresent);
-            }
-        }
-
-        return isPresent;
-    }
-
-    /**
-     * swipeInContainerTillElementWithStartDirection
-     * 
-     * @param element ExtendedWebElement
-     * @param container ExtendedWebElement
-     * @param direction can be Direction.DOWN or Direction.UP
-     * @return boolean
-     */
-    public static boolean swipeInContainerTillElementWithStartDirection(ExtendedWebElement element, ExtendedWebElement container,
-            Direction direction) {
-        int swipeTimes = 10;
-        boolean isPresent = element.isElementPresent(2);
-        LOGGER.info("Swipe to element: ".concat(element.getNameWithLocator().toString()));
-
-        Direction oppositeDirection = Direction.DOWN;
-
-        if (direction.equals(Direction.DOWN)) {
-            oppositeDirection = Direction.UP;
-        }
-
-        while (!isPresent && swipeTimes-- > 0) {
-            LOGGER.debug("Element not present! Swipe up will be executed.");
-            swipeInDevice(container, direction, 0.2, 0.8, 1000);
-            LOGGER.info("Swipe was executed. Attempts remain: " + swipeTimes);
-            isPresent = element.isElementPresent(1);
-            LOGGER.info("Result: " + isPresent);
-        }
-
-        if (!isPresent) {
-            LOGGER.info("Swipe to element: ".concat(element.getNameWithLocator().toString()));
-            swipeTimes = 10;
-
-            while (!isPresent && swipeTimes-- > 0) {
-                LOGGER.debug("Element not present! Swipe down will be executed.");
-                swipeInDevice(container, oppositeDirection, 0.2, 0.8, 1000);
-                LOGGER.info("Swipe was executed. Attempts remain: " + swipeTimes);
-                isPresent = element.isElementPresent(1);
-                LOGGER.info("Result: " + isPresent);
-            }
-        }
-
-        return isPresent;
-    }
-
-    /**
-     * swipeUntilElementPresence
-     * 
-     * @param element ExtendedWebElement
      * @param times int
      * @param duration int
-     * @return boolean
      */
-    public static boolean swipeUntilElementPresence(final ExtendedWebElement element, int times, int duration) {
-        WebDriver driver = DriverPool.getDriver();
-        Dimension scrSize;
-        int x;
-        int y;
-        boolean isPresent = element.isElementPresent(1);
-        LOGGER.info("Swipe down to element: ".concat(element.toString()));
-        while (!isPresent && times-- > 0) {
-            LOGGER.debug("Element not present! Swipe down will be executed.");
-            LOGGER.debug("Page source: ".concat(driver.getPageSource()));
-            scrSize = driver.manage().window().getSize();
-            x = scrSize.width / 2;
-            // swipe coordinates for ios should be less than for android to
-            // avoid elements' skipping
-            if (!DevicePool.getDevice().getOs().equalsIgnoreCase("android")) {
-                y = scrSize.height / 4;
-            } else {
-                y = scrSize.height / 2;
-            }
-            ((AppiumDriver<?>) driver).swipe(x, y, x, y / 2, duration);
-            LOGGER.info("Swipe was executed. Attempts remain: " + times);
-            isPresent = element.isElementPresent(1);
-            LOGGER.info("Result: " + isPresent);
+    public static void swipeUp(final int times, final int duration) {
+        for (int i = 0; i < times; i++) {
+            swipeUp(duration);
         }
-        if (!isPresent) {
-            LOGGER.info("Swipe up to element: ".concat(element.toString()));
-            while (!isPresent && times-- > 0) {
-                LOGGER.debug("Element not present! Swipe up will be executed.");
-                scrSize = driver.manage().window().getSize();
-                x = scrSize.width / 2;
-                y = scrSize.height / 2;
-                ((AppiumDriver<?>) driver).swipe(x, y / 2, x, y, duration);
-                LOGGER.info("Swipe was executed. Attempts remain: " + times);
-                isPresent = element.isElementPresent(1);
-                LOGGER.info("Result: " + isPresent);
-            }
-        }
-        return isPresent;
-    }
-
-    public static boolean swipeUntilElementPresence(final ExtendedWebElement element, int times) {
-        return swipeUntilElementPresence(element, times, 500);
     }
 
     /**
-     * swipeInDevice
+     * Swipe down several times
      * 
-     * @param direction Direction
+     * @param times int
      * @param duration int
      */
-    public static void swipeInDevice(Direction direction, int duration) {
-        int startx = 0;
-        int starty = 0;
-        int endx = 0;
-        int endy = 0;
+    public static void swipeDown(final int times, final int duration) {
+        for (int i = 0; i < times; i++) {
+            swipeDown(duration);
+        }
+    }
 
+    /**
+     * Swipe down
+     * 
+     * @param duration int
+     */
+    public static void swipeDown(final int duration) {
         WebDriver driver = DriverPool.getDriver();
-        Dimension dim = driver.manage().window().getSize();
+        int x = driver.manage().window().getSize().width / 2;
+        int y = driver.manage().window().getSize().height / 2;
+        LOGGER.info("Swipe down will be executed.");
+        swipe(x, y, x, y / 2, duration);
+    }
+	
+	/**
+     * Swipe in specified direction preliminary half a screen.
+     * <p>
+     * Tested at Nexus 6P Android 8.0.0.
+     * <p>
+     * The behavior of "moveTo" is different for some reason with/without "wait"
+     * step: 1. with "wait": Y coordinate in second "moveTo" is not relative,
+     * but obsolete: e.g. 100 will move to Y = 100 point; 2. without "wait": Y
+     * coordinate in second "moveTo" is relative: e.g. "100" will add 100 to
+     * current touch position. Seems issue against Appium should be reported here
+     * <p>
+     * Without "wait" step in general swipe is performed too fast and goes too
+     * much down - "wait" action slows down the swiping and allow to swipe
+     * only small part of screen
+     * <p>
+     * waitAction(Duration.ofSeconds(1)) - such syntax only starting from java 8
+     *
+     * @param direction direction of swiping
+     */
+    public static void swipe(Direction direction) {
+    	WebDriver driver = DriverPool.getDriver();
+        int screenWidth = driver.manage().window().getSize().getWidth();
+        int screenHeight = driver.manage().window().getSize().getHeight();
+
+        int screenCenterX = Double.valueOf(screenWidth / 2).intValue();
+        int screenCenterY = Double.valueOf(screenHeight / 2).intValue();
+
+        int offsetX = 0;
+        int offsetY = 0;
 
         switch (direction) {
-        case LEFT:
-            startx = dim.width / 4;
-            starty = dim.height / 2;
-            endx = dim.width / 2;
-            endy = starty;
-            break;
-        case RIGHT:
-            startx = dim.width / 2;
-            starty = dim.height / 2;
-            endx = dim.width / 4;
-            endy = starty;
-            break;
-        case UP:
-            startx = dim.width / 2;
-            starty = dim.height / 4;
-            endx = startx;
-            endy = dim.height / 2;
-            break;
-        case DOWN:
-            startx = dim.width / 2;
-            starty = dim.height / 2;
-            endx = startx;
-            endy = dim.height / 4;
-            break;
-        case HORIZONTAL:
-        case VERTICAL:
-        default:
+        case UP: {
+            offsetY = Double.valueOf(screenHeight - screenHeight * 0.05).intValue();
             break;
         }
-        LOGGER.debug(String.format("Swipe from (X = %d; Y = %d) to (X = %d; Y = %d)", startx, starty, endx, endy));
-        try {
-            ((AppiumDriver<?>) driver).swipe(startx, starty, endx, endy, duration);
-        } catch (Exception e) {
-            LOGGER.error(String.format("Error during Swipe from (X = %d; Y = %d) to (X = %d; Y = %d): %s", startx, starty, endx, endy, e));
+        case DOWN: {
+            offsetY = Double.valueOf(screenHeight * 0.05).intValue();
+            break;
+        }
+        case RIGHT: {
+            offsetX = Double.valueOf(screenWidth - screenWidth * 0.05).intValue();
+            break;
+        }
+        case LEFT: {
+            offsetX = Double.valueOf(screenWidth * 0.05).intValue();
+            break;
+        }
+		default:
+			throw new RuntimeException("Unknown direction!");
+        }
+
+        swipe(screenCenterX, screenCenterY, offsetX, offsetY, SWIPE_ACTION_DEFAULT_INTERVAL);
+    }
+
+    
+    /**
+     * @see MobileUtils#swipeToElement(By, Direction, int, int)
+     */
+    public static void swipeToElement(final By elementLocator) {
+        swipeToElement(elementLocator, Direction.UP, SWIPE_TO_ELEMENT_DEFAULT_TIMEOUT, SWIPE_TO_ELEMENT_DEFAULT_PULLING_TIMEOUT);
+    }
+    
+    /**
+     * @see MobileUtils#swipeToElement(By, Direction, int, int)
+     */
+    public static void swipeToElement(final By elementLocator, final Direction direction) {
+        swipeToElement(elementLocator, direction, SWIPE_TO_ELEMENT_DEFAULT_TIMEOUT, SWIPE_TO_ELEMENT_DEFAULT_PULLING_TIMEOUT);
+    }
+
+    /**
+     * Swipe to element in specified direction while it will not be present on
+     * the screen. If element is on the screen already, swiping will not be
+     * performed.
+     * <p>
+     * Method (waiting for element to be present or not) is affected by implicit
+     * wait.
+     *
+     * @param elementLocator locator of element to which it will be swiped
+     * @param direction direction of swiping
+     * @param timeout for how long to swipe, ms
+     * @param pullingTimeout pulling timeout, ms
+     * @see MobileUtils#swipe(Direction)
+     */
+    public static void swipeToElement(final By elementLocator, final Direction direction, int timeout, int pullingTimeout) {
+    	WebDriver driver = DriverPool.getDriver();
+        if (driver.findElements(elementLocator).isEmpty()) {
+
+            new FluentWait<By>(elementLocator).withTimeout(timeout, TimeUnit.SECONDS).pollingEvery(pullingTimeout, TimeUnit.MILLISECONDS)
+                    .until(new Function<By, Boolean>() {
+                        @Override
+                        public Boolean apply(By input) {
+                            swipe(direction);
+                            return !driver.findElements(elementLocator).isEmpty();
+                        }
+                    });
+        }
+    }
+
+	/**
+	 * @see MobileUtils#swipeToElementInsideContainer(WebElement, By, Direction,
+	 *      int, int)
+	 */
+	public static void swipeToElementInsideContainer(final ExtendedWebElement container, final By elementLocator) {
+		swipeToElementInsideContainer(container, elementLocator, Direction.UP, SWIPE_TO_ELEMENT_DEFAULT_TIMEOUT,
+				SWIPE_TO_ELEMENT_DEFAULT_PULLING_TIMEOUT);
+	}
+	
+	/**
+	 * @see MobileUtils#swipeToElementInsideContainer(WebElement, By, Direction,
+	 *      int, int)
+	 */
+	public static void swipeToElementInsideContainer(final ExtendedWebElement container, final By elementLocator,
+			Direction direction) {
+		swipeToElementInsideContainer(container, elementLocator, direction, SWIPE_TO_ELEMENT_DEFAULT_TIMEOUT,
+				SWIPE_TO_ELEMENT_DEFAULT_PULLING_TIMEOUT);
+	}
+
+    /**
+     * Swipe to element inside container in specified direction while element
+     * will not be present on the screen. If element is on the screen already,
+     * Swiping will not be performed.
+     * <p>
+     * Method (waiting for element to be present or not) is affected by implicit
+     * wait.
+     *
+     * @param container element, inside which swiping is expected
+     * @param elementLocator locator of element to which it will be swiped
+     * @param direction direction of swiping
+     * @param timeout for how long to swipe, ms
+     * @param pullingTimeout pulling timeout, ms
+     * @see MobileUtils#swipeInsideContainer(WebElement, Direction)
+     */
+    public static void swipeToElementInsideContainer(final ExtendedWebElement container, final By elementLocator, final Direction direction, int timeout,
+            int pullingTimeout) {
+    	WebDriver driver = DriverPool.getDriver();
+        if (driver.findElements(elementLocator).isEmpty()) {
+
+            new FluentWait<By>(elementLocator).withTimeout(timeout, TimeUnit.SECONDS).pollingEvery(pullingTimeout, TimeUnit.MILLISECONDS)
+                    .until(new Function<By, Boolean>() {
+                        @Override
+                        public Boolean apply(By input) {
+                            swipeInsideContainer(container, direction);
+                            return !driver.findElements(elementLocator).isEmpty();
+                        }
+                    });
         }
     }
 
     /**
-     * swipe Coordinates
+     * Waiting for element to be moveless. Element has different position (Y
+     * coordinate) on the screen when keyboard shown, not shown or focus is
+     * switching from one element to another, and invalid coordinates could be
+     * captured if "find element" operation was performed in inappropriate
+     * moment, as it could be changed in several moments e.g. when keyboard will
+     * be fully hidden
      *
-     * @param startX int
-     * @param startY int
-     * @param endX int
-     * @param endY int
-     * @param duration int
+     * @param webElement element to be moveless
      */
-    public static void swipeCoord(int startX, int startY, int endX, int endY, int duration) {
-        WebDriver driver = DriverPool.getDriver();
-        ((AppiumDriver<?>) driver).swipe(startX, startY, endX, endY, duration);
+    public static void waitForElementToBeMoveless(final WebElement webElement) {
+        FluentWait<WebElement> fluentWait = new FluentWait<WebElement>(webElement);
+        fluentWait.withTimeout(5, TimeUnit.SECONDS).pollingEvery(500, TimeUnit.MILLISECONDS).until(new Function<WebElement, Object>() {
+
+            int yPosition = 0;
+
+            @Override
+            public Object apply(WebElement input) {
+                int newYPosition = webElement.getLocation().getY();
+                boolean result = (0 == newYPosition - yPosition);
+                yPosition = newYPosition;
+                return Boolean.valueOf(result);
+            }
+        });
+    }
+    
+    /**
+     * Swip inside container in specified direction preliminary half a screen.
+     * <p>
+     * Tested at Nexus 6P Android 8.0.0.
+     *
+     * @param container element, inside which swiping is expected
+     * @param direction direction of swiping
+     * @see MobileUtils#swipe(Direction)
+     */
+    public static void swipeInsideContainer(ExtendedWebElement container, Direction direction) {
+    	WebDriver driver = DriverPool.getDriver();
+        int screenWidth = driver.manage().window().getSize().getWidth();
+        //int screenHeight = driver.manage().window().getSize().getHeight();
+
+        int screenCenterX = Double.valueOf(screenWidth / 2).intValue();
+        //int screenCenterY = Double.valueOf(screenHeight / 2).intValue();
+
+        //int containerPositionX = container.getLocation().getX();
+        int containerPositionY = container.getLocation().getY();
+
+        //int containerWidth = container.getSize().getWidth();
+        int containerHeight = container.getSize().getHeight();
+
+        //int containerCenterX = Double.valueOf(containerPositionX + (containerWidth / 2)).intValue();
+        int containerCenterY = Double.valueOf(containerPositionY + (containerHeight / 2)).intValue();
+
+        int offsetX = 0;
+        int offsetY = 0;
+
+		switch (direction) {
+		case UP: {
+			throw new RuntimeException("Not implemented yet");
+		}
+		case DOWN: {
+			throw new RuntimeException("Not implemented yet");
+		}
+		case RIGHT: {
+			offsetX = Double.valueOf(screenWidth - screenWidth * 0.05).intValue();
+			break;
+		}
+		case LEFT: {
+			offsetX = Double.valueOf(screenWidth * 0.05).intValue();
+			break;
+		}
+		default:
+			throw new RuntimeException("Unknown direction!");
+		}
+
+        swipe(screenCenterX, containerCenterY, offsetX, offsetY, SWIPE_ACTION_DEFAULT_INTERVAL);
+    }
+    /**
+     * Swipe from specified point to the point specified by offset.
+     *
+     * @param x X coordinate of start point
+     * @param y Y coordinate of start point
+     * @param offsetX X offset of swiping
+     * @param offsetY Y offset of swiping
+     * @param duration swipe action duration, ms
+     * @see TouchAction#moveTo(int, int)
+     */
+    public static void swipe(int x, int y, int offsetX, int offsetY, int duration) {
+        new TouchAction((AppiumDriver<?>) DriverPool.getDriver()).press(x, y).waitAction(Duration.ofMillis(duration)).moveTo(offsetX, offsetY).release().perform();
     }
 
-    /**
-     * swipe Coordinates
-     *
-     * @param startX int
-     * @param startY int
-     * @param endX int
-     * @param endY int
-     */
-    public static void swipeCoord(int startX, int startY, int endX, int endY) {
-        swipeCoord(startX, startY, endX, endY, DEFAULT_SWIPE_TIMEOUT);
-    }
 }

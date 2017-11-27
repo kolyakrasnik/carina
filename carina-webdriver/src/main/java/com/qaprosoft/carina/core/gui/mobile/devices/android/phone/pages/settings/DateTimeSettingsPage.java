@@ -1,14 +1,12 @@
 package com.qaprosoft.carina.core.gui.mobile.devices.android.phone.pages.settings;
 
-import com.qaprosoft.carina.core.foundation.utils.mobile.MobileUtils;
-import com.qaprosoft.carina.core.foundation.webdriver.decorator.ExtendedWebElement;
-import com.qaprosoft.carina.core.gui.mobile.devices.MobileAbstractPage;
 import org.apache.log4j.Logger;
-import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.FindBy;
 
-import java.util.List;
+import com.qaprosoft.carina.core.foundation.utils.mobile.MobileUtils;
+import com.qaprosoft.carina.core.foundation.webdriver.decorator.ExtendedWebElement;
+import com.qaprosoft.carina.core.gui.mobile.devices.MobileAbstractPage;
 
 public class DateTimeSettingsPage extends MobileAbstractPage {
 
@@ -44,12 +42,8 @@ public class DateTimeSettingsPage extends MobileAbstractPage {
     public void openTimeZoneSetting() {
         boolean found = selectTimeZone.clickIfPresent(SHORT_TIMEOUT);
         if (!found) {
-            boolean scrolled = MobileUtils.swipeInContainerTillElement(
-                    selectTimeZone,
-                    scrollableContainer);
-            if (scrolled) {
-                found = selectTimeZone.clickIfPresent(SHORT_TIMEOUT);
-            }
+			MobileUtils.swipeToElementInsideContainer(scrollableContainer, selectTimeZone.getBy());
+            found = selectTimeZone.clickIfPresent(SHORT_TIMEOUT);
         }
         LOGGER.info("Select Time Zone Menu item was clicked: " + found);
     }
@@ -63,25 +57,23 @@ public class DateTimeSettingsPage extends MobileAbstractPage {
      * @return boolean
      */
     public boolean selectTimeZone(String tz, String timezone) {
-        int defaultSwipeTime = 15;
+/*        int defaultSwipeTime = 15;
         boolean multiTimezoneText = false;
         String baseTimezoneText = timezone;
-        boolean selected = false;
+*/
 
         LOGGER.info("Searching for tz: " + tz);
         //TODO: Think how to cover GMT+3:00 instead of GMT+03:00 on some devices.
         if (scrollableContainer.isElementPresent(SHORT_TIMEOUT)) {
             LOGGER.info("Scrollable container present.");
-            boolean scrolled = MobileUtils.swipeInContainerTillElement(
-                    format(tzSelectionBase, tz),
-                    scrollableContainer, defaultSwipeTime);
-            if (!scrolled) {
-                LOGGER.info("Probably we have long list. Let's increase swipe attempts.");
-                defaultSwipeTime = 30;
-                scrolled = MobileUtils.swipeInContainerTillElement(
-                        format(tzSelectionBase, tz),
-                        scrollableContainer, defaultSwipeTime);
-            }
+            ExtendedWebElement tzElement = format(tzSelectionBase, tz);
+			MobileUtils.swipeToElementInsideContainer(scrollableContainer, tzElement.getBy());
+			tzElement.click();
+			return true;
+        }
+        return false;
+
+/*			
             if (scrolled) {
                 if (timezone.isEmpty()) {
                     LOGGER.info("Select timezone by GMT: " + tz);
@@ -159,26 +151,7 @@ public class DateTimeSettingsPage extends MobileAbstractPage {
             }
 
         }
-
-        return selected;
-    }
-
-    /**
-     * selectTimezoneByText
-     *
-     * @param timezone         String
-     * @param defaultSwipeTime int
-     * @return boolean
-     */
-    private boolean selectTimezoneByText(String timezone, int defaultSwipeTime) {
-        boolean scrolled = MobileUtils.swipeInContainerTillElement(
-                format(tzSelectionBase, timezone),
-                scrollableContainer, defaultSwipeTime);
-        if (scrolled) {
-            LOGGER.info("Select timezone by TimeZone text: " + timezone);
-            format(tzSelectionBase, timezone).click();
-        }
-        return scrolled;
+*/
     }
 
     /**
