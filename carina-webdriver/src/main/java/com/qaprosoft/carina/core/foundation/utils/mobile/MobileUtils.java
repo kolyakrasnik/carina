@@ -250,8 +250,8 @@ public class MobileUtils {
     }
 
 	/**
-	 * @see MobileUtils#swipeToElementInsideContainer(WebElement, By, Direction,
-	 *      int, int)
+	 * @see MobileUtils#swipeToElementInsideContainer(ExtendedWebElement, By,
+	 *      Direction, int, int)
 	 */
 	public static void swipeToElementInsideContainer(final ExtendedWebElement container, final By elementLocator) {
 		swipeToElementInsideContainer(container, elementLocator, Direction.UP, SWIPE_TO_ELEMENT_DEFAULT_TIMEOUT,
@@ -259,8 +259,8 @@ public class MobileUtils {
 	}
 	
 	/**
-	 * @see MobileUtils#swipeToElementInsideContainer(WebElement, By, Direction,
-	 *      int, int)
+	 * @see MobileUtils#swipeToElementInsideContainer(ExtendedWebElement, By,
+	 *      Direction, int, int)
 	 */
 	public static void swipeToElementInsideContainer(final ExtendedWebElement container, final By elementLocator,
 			Direction direction) {
@@ -281,7 +281,7 @@ public class MobileUtils {
      * @param direction direction of swiping
      * @param timeout for how long to swipe, ms
      * @param pullingTimeout pulling timeout, ms
-     * @see MobileUtils#swipeInsideContainer(WebElement, Direction)
+     * @see MobileUtils#swipeInsideContainer(ExtendedWebElement, Direction)
      */
     public static void swipeToElementInsideContainer(final ExtendedWebElement container, final By elementLocator, final Direction direction, int timeout,
             int pullingTimeout) {
