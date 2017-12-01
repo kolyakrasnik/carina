@@ -50,6 +50,7 @@
         <module>carina-reporting</module>
         <module>carina-crypto</module>
         <module>carina-webdriver</module>
+        <module>carina-webdriver-new</module>
         <module>carina-aws-s3</module>
         <module>carina-hockeyapp</module>
         <module>carina-core</module>
